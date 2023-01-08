@@ -15,6 +15,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from boxes import *
+from functools import partial
 
 class AdjustableShelf(Boxes):
     """An adjustable shelf"""
@@ -41,41 +42,32 @@ class AdjustableShelf(Boxes):
             shelf, so that the inner sidewalls can be placed and are
             not cut apart entirely""")
         
-
-    def create_back_wall_holes(self):
-        h = self.inner_h
-        nx = len(self.sx)
-        nh = len(self.sh)
-        w = self.inner_x / nx
-        for i in range(nx-1):
-            self.fingerHolesAt((i+1)*w, 0, h, angle=90)
-        
-    def create_top_wall_holes(self):
-        nx = len(self.sx)
-        y = self.y
-        w = self.inner_x / nx
-        for i in range(nx-1):
-            self.fingerHolesAt((i+1)*w, 0, y, angle=90)
-
-    def slider_cutout(self):
-        sh = self.sh
+    def create_back_wall_holes(self, sx, sh, h, slop, t):
+        nx = len(sx)
         nh = len(sh)
-        t = self.thickness
-        y = self.y
+        x = 0
+        pos = -t/2
+        for i, w in enumerate(sx[:-1]):
+            pos += t+2*t+2*slop+w
+            self.fingerHolesAt(pos, 0, h, angle=90)
+
+    def slider_cutout(self, sh, t, y, attach, slop):
+        nh = len(sh)
         pos = 0
-        
+
         for h in sh[:-1]:
             pos += h + t
-            self.rectangularHole(0, pos, y-self.attach, t+self.slop, center_x = False)
+            self.rectangularHole(0, pos-t/2, y-attach, t+slop, center_x = False)
 
-    def shelf_cutout(self):
+    def shelf_cutout(self, x, slop):
         sh = self.sh
         nh = len(sh)
         t = self.thickness
         y = self.y
         pos = 0
-        for z in [0, self.sx[0]]:
-            self.rectangularHole(y-self.attach, z, self.attach, t+self.slop, center_x = False)
+        for z in [0, x]:
+            self.rectangularHole(y-self.attach, z, self.attach, t+slop, center_x = False)
+
     def create_outer_box(self):
         sx, y, sh, t = self.sx, self.y, self.sh, self.thickness
 
@@ -85,8 +77,9 @@ class AdjustableShelf(Boxes):
         # inner vertical walls are 3 thicknesses, i.e. 3 *extra*
         #      thicknesses for every interior vertical walls.
 
-        n_internal_vert_walls = len(sx)-1
-        x = sum(sx) + 2*t + 3*t*n_internal_vert_walls
+        #   used space + end walls       + innter walls
+        slop = self.slop
+        x = sum(sx)    + 2*(t+slop) + (len(sx)-1)*(3*t+2*slop)
         h = sum(sh) + (len(sh)-1)*t
         self.inner_h = h
         self.inner_x = x
@@ -95,18 +88,20 @@ class AdjustableShelf(Boxes):
         # Create the rear of the box
         # Create the sidewalls of the outer box
 
-        self.rectangularWall(
-            y, h, move="right", edges="FFFe")
-        self.rectangularWall(
-            x, h, move="right", edges="ffff",
-            callback=[self.create_back_wall_holes])
-        self.rectangularWall(
-        y, h, move="up", edges="FeFF")
+        # left wall
+        self.rectangularWall(y, h, move="right"  , edges="FFFe")
+
+        # back wall
+        callback = [partial(self.create_back_wall_holes, sx, sh, h, slop, t)]
+        self.rectangularWall(x, h, move="right"  , edges="ffff", callback=callback)
+
+        # right wall
+        self.rectangularWall(y, h, move="up"     , edges="FeFF")
+
         # Create the top and bottom of the outer box
-        self.rectangularWall(
-            x, y, move="left up", edges="Ffef", callback=[self.create_top_wall_holes])
-        self.rectangularWall(
-            x, y, move="up",      edges="efFf", callback=[self.create_top_wall_holes])
+        callback = [partial(self.create_back_wall_holes, sx, sh, y, slop, t)]
+        self.rectangularWall(x, y, move="left up", edges="Ffef", callback=callback)
+        self.rectangularWall(x, y, move="up"     , edges="efFf", callback=callback)
 
         # Create the inner walls
         nx = len(sx)
@@ -120,15 +115,18 @@ class AdjustableShelf(Boxes):
         # Create the inner shelf sliders
         for i in range(2+(nx-1)*2):
             move = "right"
+            callback = [partial(self.slider_cutout, sh, t, y, self.attach, slop)]
             self.rectangularWall(
-                y, h, move=move, edges="eeee", callback=[self.slider_cutout])
+                y, h, move=move, edges="eeee", callback=callback)
 
         # And finally, create a sample shelf of each width
         sizes = {}
         for x in sx:
             if x not in sizes:
                 sizes[x] = True
-                self.rectangularWall(y, x, move="up", callback=[self.shelf_cutout])
+                w = x+2*t-2*slop
+                callback = [partial(self.shelf_cutout, w, slop)]
+                self.rectangularWall(y, w, move="up", edges="eeee", callback=callback)
         return
 
     def create_tray(self):
