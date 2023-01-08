@@ -66,7 +66,7 @@ class AdjustableShelf(Boxes):
         y = self.y
         pos = 0
         for z in [0, x]:
-            self.rectangularHole(y-self.attach, z, self.attach, t+slop, center_x = False)
+            self.rectangularHole(y-self.attach, z, self.attach, t*2+slop, center_x = False)
 
     def create_outer_box(self):
         sx, y, sh, t = self.sx, self.y, self.sh, self.thickness
