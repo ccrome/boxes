@@ -40,6 +40,18 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
     import boxes.generators
 
+def get_git_slug():
+    try:
+        return os.environ['BOXES_GIT_SLUG']
+    except KeyError:
+        return "unknown"
+
+def get_git_repo():
+    try:
+        return os.environ['BOXES_GIT_REPO']
+    except KeyError:
+        return "https://github.com/florianfesti/boxes"
+
 class FileChecker(threading.Thread):
     def __init__(self, files=[], checkmodules=True) -> None:
         super(FileChecker, self).__init__()
@@ -383,6 +395,7 @@ f"""        </script>{self.scripts % len(self.groups)}
 
     def footer(self, lang):
         _ = lang.gettext
+        
         language = lang.info().get('language', '')
         return """
 <div class="footer container">
@@ -396,7 +409,8 @@ f"""        </script>{self.scripts % len(self.groups)}
   <li><a href="https://florianfesti.github.io/boxes/html/usermanual.html">""" + _("Help") + """</a></li>
   <li><a href="https://hackaday.io/project/10649-boxespy">""" + _("Home Page") + """</a></li>
   <li><a href="https://florianfesti.github.io/boxes/html/index.html">""" + _("Documentation") + """</a></li>
-  <li><a href="https://github.com/florianfesti/boxes">""" + _("Sources") + """</a></li>
+  """ + f'<li><a href="{get_git_repo()}">{_("Sources")}</a></li>' + """
+  """ + f'<li><a href="{get_git_repo()}/commit/{get_git_slug()}">SHA1: {get_git_slug()}</a></li>' + """
 </ul>
 </div>
 """

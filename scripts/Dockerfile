@@ -17,10 +17,17 @@ FROM fedora:latest
 RUN dnf install -y git-core python3-markdown python3-setuptools python3-affine python3-shapely pstoedit && dnf clean all
 
 # Get Boxes.py sources to /boxes
-RUN git clone --depth 1 -b master https://github.com/florianfesti/boxes.git
+ARG BOXES_GIT_BRANCH
+ARG BOXES_GIT_REPO
+ARG BOXES_GIT_SLUG
+RUN git clone --depth 1 -b ${BOXES_GIT_BRANCH} ${BOXES_GIT_REPO}
 
 # Internal port used
 EXPOSE 8000
 
 # Start the boxes web server on container start up
+ENV BOXES_GIT_BRANCH ${BOXES_GIT_BRANCH}
+ENV BOXES_GIT_REPO ${BOXES_GIT_REPO}
+ENV BOXES_GIT_SLUG ${BOXES_GIT_SLUG}
+RUN echo $BOXES_GIT_BRANCH
 CMD ["/boxes/scripts/boxesserver"]
