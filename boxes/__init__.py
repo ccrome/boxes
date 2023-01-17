@@ -39,6 +39,16 @@ from boxes import pulley
 from boxes import svgutil
 from boxes.Color import *
 
+try:
+    import qrcode
+    import qrcode.image.svg
+    import base64
+    from boxes.qrcode_factory import BoxesQrCodeFactory
+    QrCodeGenerationSupported = True
+except ImportError:
+    QrCodeGenerationSupported = False
+
+from boxes.qrcode_factory import BoxesQrCodeFactory
 
 ### Helpers
 
@@ -90,6 +100,8 @@ def holeCol(func):
 
     return f
 
+def base64(bytes_array):
+    return base64.b64encode(bytes_array).decode('UTF-8')
 
 #############################################################################
 ### Building blocks
@@ -321,6 +333,9 @@ class Boxes:
             "--tabs", action="store", type=float, default=0.0,
             help="width of tabs holding the parts in place (in mm)(not supported everywhere) [\U0001F6C8](https://florianfesti.github.io/boxes/html/usermanual.html#tabs)")
         defaultgroup.add_argument(
+            "--qrcode", action="store", type=boolarg, default=False,
+            help="Add a QR Code to the generated output")
+        defaultgroup.add_argument(
             "--debug", action="store", type=boolarg, default=False,
             help="print surrounding boxes for some structures [\U0001F6C8](https://florianfesti.github.io/boxes/html/usermanual.html#debug)")
         defaultgroup.add_argument(
@@ -397,8 +412,20 @@ class Boxes:
                 self.text("%.fmm, burn:%.2fmm" % (self.reference , self.burn), self.reference / 2.0, 5,
                           fontsize=8, align="middle center", color=Color.ANNOTATIONS)
             self.move(self.reference, 10, "up")
+            self.renderQrCode(str(random.random()))
             self.ctx.stroke()
+            
+    def renderQrCode(self, url):
+        if not QrCodeGenerationSupported:
+            return
+        import random
+        q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
+        q.add_data(url)
+        self.move(0, 25, "up", before=True)
+        img = q.make_image(ctx=self.ctx)
+        self.move(0, 25, "up")
 
+    
     def buildArgParser(self, *l, **kw):
         """
         Add commonly used arguments
