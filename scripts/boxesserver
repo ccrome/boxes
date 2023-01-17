@@ -30,6 +30,7 @@ import traceback
 from typing import Any, NoReturn
 from urllib.parse import unquote_plus, quote
 from wsgiref.simple_server import make_server
+import subprocess
 
 import markdown
 
@@ -110,6 +111,24 @@ class BServer:
         self._cache: dict[Any, Any] = {}
         self.url_prefix = url_prefix
         self.static_url = static_url
+        self.configure_git_info()
+
+    def configure_git_info(self):
+        """Gets the git remote, branch, tag, and SHA and stores it in self.git"""
+
+        def get_rev(cmd, default):
+            filedir = os.path.dirname(os.path.realpath(__file__))
+            result = default;
+            r = subprocess.run(cmd, capture_output=True, cwd=filedir)
+            if (r.returncode == 0):
+                result = r.stdout.decode('utf-8').strip()
+            return result
+
+        self.git = {
+            "branch": get_rev(["git", "rev-parse", "--abbrev-ref", "HEAD"], "unknown"),
+            "sha": get_rev(["git", "rev-parse", "--short", "HEAD"], "unknown"),
+            "remote": get_rev(["git", "remote", "get-url", "origin"], "https://github.com/florianfesti/boxes.git"),
+        }
 
     def getLanguages(self, domain=None, localedir=None):
         if self._languages is not None:
@@ -400,7 +419,7 @@ class BServer:
     def genPagePartFooter(self, lang) -> str:
         _ = lang.gettext
 
-        return """
+        return f"""
 <div class="footer container">
 <ul>
   <li>""" + self.genHTMLLanguageSelection(lang) + """</li>
@@ -409,6 +428,7 @@ class BServer:
   <li><a href="https://florianfesti.github.io/boxes/html/index.html" target="_blank" rel="noopener">""" + _("Documentation") + """</a></li>
   <li><a href="https://github.com/florianfesti/boxes" target="_blank" rel="noopener">""" + _("Sources") + """</a></li>
   <li><a href="Gallery">""" + _("Gallery") + """</a></li>
+  <li><div class="tooltip">Version {self.git["sha"]}<span class="tooltiptext">remote: {html.escape(self.git["remote"])}<br>branch: {self.git["branch"]}<br>SHA1: {self.git["sha"]}</span></div></li>
 </ul>
 </div>
 """
