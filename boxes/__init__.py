@@ -42,7 +42,6 @@ from boxes.Color import *
 try:
     import qrcode
     import qrcode.image.svg
-    import base64
     from boxes.qrcode_factory import BoxesQrCodeFactory
     QrCodeGenerationSupported = True
 except ImportError:
@@ -99,9 +98,6 @@ def holeCol(func):
             self.ctx.stroke()
 
     return f
-
-def base64(bytes_array):
-    return base64.b64encode(bytes_array).decode('UTF-8')
 
 #############################################################################
 ### Building blocks
@@ -306,6 +302,7 @@ class Boxes:
         self.argparser = ArgumentParser(description=description)
         self.edgesettings: dict[Any, Any] = {}
         self.inkscapefile = None
+        self.non_default_args: dict[Any, Any] = {}
 
         self.metadata = {
             "name" : self.__class__.__name__,
@@ -412,19 +409,52 @@ class Boxes:
                 self.text("%.fmm, burn:%.2fmm" % (self.reference , self.burn), self.reference / 2.0, 5,
                           fontsize=8, align="middle center", color=Color.ANNOTATIONS)
             self.move(self.reference, 10, "up")
-            self.renderQrCode(str(random.random()))
+            self.renderQrCode()
             self.ctx.stroke()
             
-    def renderQrCode(self, url):
+    def renderQrCode(self):
+        def filter_url(url, non_default_args):
+            if len(url) == 0:
+                return ''
+            try:
+                base, args = url.split('?')
+            except ValueError:
+                return ''
+            args = args.split('&')
+            new_args = []
+            for arg in args:
+                a, b = arg.split('=')
+                if a in non_default_args:
+                    new_args.append(arg)
+            new_url = f"{base}?{'&'.join(new_args)}"
+            return new_url
+
+        def filter_cli(cli, non_default_args):
+            return cli
+        
+        if not self.qrcode:
+            return
         if not QrCodeGenerationSupported:
             return
-        import random
-        q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
-        q.add_data(url)
-        self.move(0, 25, "up", before=True)
-        img = q.make_image(ctx=self.ctx)
-        self.move(0, 25, "up")
-
+        dim = 0
+        with self.saved_context():
+            self.set_source_color(Color.ETCHING)
+            url = None
+            if len(self.metadata['url']) > 0:
+                url = filter_url(self.metadata['url'], self.non_default_args)
+            if len(self.metadata['cli']) > 0:
+                url = filter_cli(self.metadata['cli'], self.non_default_args)
+            if len(url) > 0:
+                q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
+                dim = len(q.get_matrix())*1.25 + 5
+                q.add_data(url)
+                self.move(0, dim, "up", before=True)
+                img = q.make_image(ctx=self.ctx)
+        if dim > 0:
+            with self.saved_context():
+                self.text(text=url, x=dim, color=Color.ANNOTATIONS, fontsize=4)
+            self.move(0, dim, "up")
+        
     
     def buildArgParser(self, *l, **kw):
         """
@@ -548,13 +578,18 @@ class Boxes:
             return quote(s)
 
         self.metadata["cli"] = "boxes " + self.__class__.__name__ + " " + " ".join(cliquote(arg) for arg in args)
+
         for key, value in vars(self.argparser.parse_args(args=args)).items():
+            default = self.argparser.get_default(key)
+            
             # treat edge settings separately
             for setting in self.edgesettings:
                 if key.startswith(setting + '_'):
                     self.edgesettings[setting][key[len(setting)+1:]] = value
                     continue
             setattr(self, key, value)
+            if (value != default):
+                self.non_default_args[key] = value
 
         # Change file ending to format if not given explicitly
         format = getattr(self, "format", "svg")
