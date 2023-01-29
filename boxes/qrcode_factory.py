@@ -11,9 +11,10 @@ class BoxesQrCodeFactory(qrcode.image.base.BaseImage):
     kind = "SVG"
     allowed_kinds = ("SVG",)
 
-    def __init__(self, *args, ctx=None, **kwargs):
+    def __init__(self, *args, ctx=None, x=0, y=0, **kwargs):
         super().__init__(*args, **kwargs)
         self.ctx = ctx
+        self.x, self.y = x, y
         # Save the unit size, for example the default box_size of 10 is '1mm'.
         self.unit_size = self.units(self.box_size)
 
@@ -45,6 +46,8 @@ class BoxesQrCodeFactory(qrcode.image.base.BaseImage):
         x, y = row, col
         x, y = float(x), float(y)
         w, h = float(1), float(1)
+        x += self.x
+        y += self.y
         return x, y, w, h
 
     def _write(self, stream):

@@ -430,30 +430,54 @@ class Boxes:
             return new_url
 
         def filter_cli(cli, non_default_args):
-            return cli
+            new_cli = ""
+            parts = cli.split(" ")
+            cmd, box = parts[0:2]
+            args = parts[2:]
+            new_args = []
+            for arg in args:
+                try:
+                    k, v = arg.split("=")
+                    k = k.replace('--', '')
+                    print(k, v)
+                except ValueError as e:
+                    # Some args, like Mounting_style=straight+edge%2C
+                    # have values I don't know how to deal with
+                    continue
+                print(k)
+                if k in non_default_args:
+                    new_args.append(arg)
+            print(new_args)
+            new_cli = [cmd, box, *new_args]
+            new_cli = " ".join(new_cli)
+            return new_cli
         
         if not self.qrcode:
             return
         if not QrCodeGenerationSupported:
             return
         dim = 0
+        self.set_source_color(Color.ETCHING)
+        url = filter_url(self.metadata['url'], self.non_default_args)
+        cli = filter_cli(self.metadata['cli'], self.non_default_args)
+        x = 0
+        max_up = 0
         with self.saved_context():
-            self.set_source_color(Color.ETCHING)
-            url = None
-            if len(self.metadata['url']) > 0:
-                url = filter_url(self.metadata['url'], self.non_default_args)
-            if len(self.metadata['cli']) > 0:
-                url = filter_cli(self.metadata['cli'], self.non_default_args)
-            if len(url) > 0:
-                q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
-                dim = len(q.get_matrix())*1.25 + 5
-                q.add_data(url)
-                self.move(0, dim, "up", before=True)
-                img = q.make_image(ctx=self.ctx)
+            self.move(0, 0, "up", before=True)
+            for u in [url, cli]:
+                if len(u) > 0:
+                    q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
+                    dim = len(q.get_matrix())*1.25 + 5
+                    if dim > max_up:
+                        max_up  = dim
+                    q.add_data(u)
+                    img = q.make_image(ctx=self.ctx, x=x, y=0)
+                    x += dim
         if dim > 0:
-            with self.saved_context():
-                self.text(text=url, x=dim, color=Color.ANNOTATIONS, fontsize=4)
-            self.move(0, dim, "up")
+            self.text(text=cli, y=6, x=x, color=Color.ANNOTATIONS, fontsize=4)
+            self.text(text=url, y=0, x=x, color=Color.ANNOTATIONS, fontsize=4)
+            self.move(x, max_up, "up")
+        self.set_source_color(Color.OUTER_CUT)
         
     
     def buildArgParser(self, *l, **kw):
