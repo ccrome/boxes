@@ -97,15 +97,8 @@ You can replace the space characters representing the floor by a "X" to remove t
         Boxes.__init__(self)
         self.addSettingsArgs(boxes.edges.FingerJointSettings)
         self.buildArgParser("h", "hi", "outside")
-        if not webargs:
-            self.argparser.add_argument(
-                "--input", action="store", type=argparse.FileType('r'),
-                default='traylayout.txt',
-                help="layout file")
-            self.layout = None
-        else:
-            self.argparser.add_argument(
-                "--layout", action="store", type=str, default="")
+        self.argparser.add_argument(
+            "--layout", action="store", type=str, default="")
 
     # Use normal open and close
     open = Boxes.open
@@ -154,7 +147,7 @@ You can replace the space characters representing the floor by a "X" to remove t
         edge = self.edges.get(edge, edge)
         edge(length)
 
-    def render(self):
+    def render(self, baseplate_callback=None):
 
         if self.layout:
             self.parse(self.layout.split('\n'))
@@ -359,6 +352,7 @@ You can replace the space characters representing the floor by a "X" to remove t
                             self.edgeAt("e", posx + t + b, posy - t, t, 90)
                 elif x < lx and self.floors[y][x]:
                     # Left edge
+                    print(e, posx, b, posy)
                     self.edgeAt(e, posx - b, posy + self.y[y], self.y[y], -90)
                     if x == 0 or y == 0 or not self.floors[y - 1][x - 1]:
                         self.edgeAt("e", posx - b, posy + self.y[y] + t, t, -90)
@@ -367,6 +361,10 @@ You can replace the space characters representing the floor by a "X" to remove t
                 posy += self.y[y] + self.thickness
             if x < lx:
                 posx += self.x[x] + self.thickness
+
+        if baseplate_callback is not None:
+            baseplate_callback()
+
 
 
     def parse(self, input):
