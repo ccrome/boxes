@@ -39,6 +39,15 @@ from boxes import pulley
 from boxes import svgutil
 from boxes.Color import *
 
+try:
+    import qrcode
+    import qrcode.image.svg
+    from boxes.qrcode_factory import BoxesQrCodeFactory
+    QrCodeGenerationSupported = True
+except ImportError:
+    QrCodeGenerationSupported = False
+
+from boxes.qrcode_factory import BoxesQrCodeFactory
 
 ### Helpers
 
@@ -89,7 +98,6 @@ def holeCol(func):
             self.ctx.stroke()
 
     return f
-
 
 #############################################################################
 ### Building blocks
@@ -294,6 +302,7 @@ class Boxes:
         self.argparser = ArgumentParser(description=description)
         self.edgesettings: dict[Any, Any] = {}
         self.inkscapefile = None
+        self.non_default_args: dict[Any, Any] = {}
 
         self.metadata = {
             "name" : self.__class__.__name__,
@@ -320,6 +329,9 @@ class Boxes:
         defaultgroup.add_argument(
             "--tabs", action="store", type=float, default=0.0,
             help="width of tabs holding the parts in place (in mm)(not supported everywhere) [\U0001F6C8](https://florianfesti.github.io/boxes/html/usermanual.html#tabs)")
+        defaultgroup.add_argument(
+            "--qrcode", action="store", type=boolarg, default=False,
+            help="Add a QR Code to the generated output")
         defaultgroup.add_argument(
             "--debug", action="store", type=boolarg, default=False,
             help="print surrounding boxes for some structures [\U0001F6C8](https://florianfesti.github.io/boxes/html/usermanual.html#debug)")
@@ -397,8 +409,77 @@ class Boxes:
                 self.text("%.fmm, burn:%.2fmm" % (self.reference , self.burn), self.reference / 2.0, 5,
                           fontsize=8, align="middle center", color=Color.ANNOTATIONS)
             self.move(self.reference, 10, "up")
+            self.renderQrCode()
             self.ctx.stroke()
+            
+    def renderQrCode(self):
+        def filter_url(url, non_default_args):
+            if len(url) == 0:
+                return ''
+            try:
+                base, args = url.split('?')
+            except ValueError:
+                return ''
+            args = args.split('&')
+            new_args = []
+            for arg in args:
+                a, b = arg.split('=')
+                if a in non_default_args:
+                    new_args.append(arg)
+            new_url = f"{base}?{'&'.join(new_args)}"
+            return new_url
 
+        def filter_cli(cli, non_default_args):
+            new_cli = ""
+            parts = cli.split(" ")
+            cmd, box = parts[0:2]
+            args = parts[2:]
+            new_args = []
+            for arg in args:
+                try:
+                    k, v = arg.split("=")
+                    k = k.replace('--', '')
+                    print(k, v)
+                except ValueError as e:
+                    # Some args, like Mounting_style=straight+edge%2C
+                    # have values I don't know how to deal with
+                    continue
+                print(k)
+                if k in non_default_args:
+                    new_args.append(arg)
+            print(new_args)
+            new_cli = [cmd, box, *new_args]
+            new_cli = " ".join(new_cli)
+            return new_cli
+        
+        if not self.qrcode:
+            return
+        if not QrCodeGenerationSupported:
+            return
+        dim = 0
+        self.set_source_color(Color.ETCHING)
+        url = filter_url(self.metadata['url'], self.non_default_args)
+        cli = filter_cli(self.metadata['cli'], self.non_default_args)
+        x = 0
+        max_up = 0
+        with self.saved_context():
+            self.move(0, 0, "up", before=True)
+            for u in [url, cli]:
+                if len(u) > 0:
+                    q = qrcode.QRCode(image_factory=BoxesQrCodeFactory, box_size=10)
+                    dim = len(q.get_matrix())*1.25 + 5
+                    if dim > max_up:
+                        max_up  = dim
+                    q.add_data(u)
+                    img = q.make_image(ctx=self.ctx, x=x, y=0)
+                    x += dim
+        if dim > 0:
+            self.text(text=cli, y=6, x=x, color=Color.ANNOTATIONS, fontsize=4)
+            self.text(text=url, y=0, x=x, color=Color.ANNOTATIONS, fontsize=4)
+            self.move(x, max_up, "up")
+        self.set_source_color(Color.OUTER_CUT)
+        
+    
     def buildArgParser(self, *l, **kw):
         """
         Add commonly used arguments
@@ -521,13 +602,18 @@ class Boxes:
             return quote(s)
 
         self.metadata["cli"] = "boxes " + self.__class__.__name__ + " " + " ".join(cliquote(arg) for arg in args)
+
         for key, value in vars(self.argparser.parse_args(args=args)).items():
+            default = self.argparser.get_default(key)
+            
             # treat edge settings separately
             for setting in self.edgesettings:
                 if key.startswith(setting + '_'):
                     self.edgesettings[setting][key[len(setting)+1:]] = value
                     continue
             setattr(self, key, value)
+            if (value != default):
+                self.non_default_args[key] = value
 
         # Change file ending to format if not given explicitly
         format = getattr(self, "format", "svg")
