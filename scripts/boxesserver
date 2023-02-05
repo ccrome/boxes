@@ -427,8 +427,8 @@ class BServer:
   <li><a href="https://hackaday.io/project/10649-boxespy" target="_blank" rel="noopener">""" + _("Home Page") + """</a></li>
   <li><a href="https://florianfesti.github.io/boxes/html/index.html" target="_blank" rel="noopener">""" + _("Documentation") + """</a></li>
   <li><a href="https://github.com/florianfesti/boxes" target="_blank" rel="noopener">""" + _("Sources") + """</a></li>
-  <li><a href="Gallery">""" + _("Gallery") + """</a></li>
-  <li><div class="tooltip">Version {self.git["sha"]}<span class="tooltiptext">remote: {html.escape(self.git["remote"])}<br>branch: {self.git["branch"]}<br>SHA1: {self.git["sha"]}</span></div></li>
+  <li><a href="Gallery">""" + _("Gallery") + """</a></li>""" + \
+  f"""<li><div class="tooltip">Version {self.git["sha"]}<span class="tooltiptext">remote: {html.escape(self.git["remote"])}<br>branch: {self.git["branch"]}<br>SHA1: {self.git["sha"]}</span></div></li>
 </ul>
 </div>
 """
