@@ -26,7 +26,7 @@ this compartment.
         Boxes.__init__(self)
         self.addSettingsArgs(boxes.edges.FingerJointSettings)
         self.addSettingsArgs(lids.LidSettings)
-        self.buildArgParser(h=50)
+        self.buildArgParser(h=50, sh="0")
         self.outside = True # We're *always* outside for gridfinity
         self.pitch = 42.0 # gridfinity pitch is defined as 42.
         self.opening = 38
@@ -37,6 +37,7 @@ this compartment.
         self.argparser.add_argument("--countx", type=int, default=5, help="split x into this many grid sections.  0 means same as --nx")
         self.argparser.add_argument("--county", type=int, default=3, help="split y into this many grid sections.  0 means same as --ny")
         self.argparser.add_argument("--margin", type=float, default=0.75, help="Leave this much total margin on the outside, in mm")
+
         self.argparser.add_argument("--layout", type=str, help="You can hand edit this before generating", default="");
         
     def generate_layout(self):
@@ -101,16 +102,19 @@ this compartment.
         self.y = self.pitch * self.ny - self.margin
         self.outer_x = self.x
         self.outer_y = self.y
-
+        print(self.sh)
         self.prepare()
         self.walls()
         with self.saved_context():
             self.base_plate(callback=[self.baseplate_etching],
                             move="mirror right")
+            if self.countx == 1 and self.county == 1:
+                for wall_h in self.sh:
+                    if wall_h == 0:
+                        continue
+                    self.base_plate(move="mirror right")
             foot = self.opening - self.opening_margin
             for i in range(min(self.nx * self.ny, 4)):
                 self.rectangularWall(foot, foot, move="right")
-        self.base_plate(callback=[self.baseplate_etching],
-                        move="up only")
         self.lid(sum(self.x) + (len(self.x)-1) * self.thickness,
                  sum(self.y) + (len(self.y)-1) * self.thickness)
